@@ -3,562 +3,390 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SURVIVE.IO - ULTRA POLISHED</title>
+  <title>SURVIVE.IO - REAL MULTIPLAYER</title>
+  <!-- Free PeerJS Library for direct device-to-device multiplayer -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
-    body, html { width:100%; height:100%; overflow:hidden; background:#1b2419; font-family:'Segoe UI', Roboto, sans-serif; }
+    body, html { width:100%; height:100%; overflow:hidden; background:#172216; font-family:'Segoe UI', sans-serif; }
     #canvas { display:block; width:100vw; height:100vh; }
     #ui { position:absolute; inset:0; pointer-events:none; }
     .interactive { pointer-events:auto; }
 
-    /* HUD Styling */
     .hud-box {
-      position:absolute; background:rgba(15, 23, 42, 0.82);
-      border:1px solid rgba(255, 255, 255, 0.12);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-      backdrop-filter:blur(8px); border-radius:12px; color:#fff;
+      position:absolute; background:rgba(15, 23, 42, 0.85);
+      border:1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.5); backdrop-filter:blur(8px);
+      border-radius:12px; color:#fff;
     }
 
-    /* Resources */
-    #res {
-      top:16px; left:16px; padding:10px 18px; display:flex; gap:16px;
-      font-size:13px; font-weight:700; align-items:center;
+    /* Lobby Join Screen */
+    #lobby-modal {
+      position:absolute; inset:0; background:rgba(0,0,0,0.8);
+      display:flex; justify-content:center; align-items:center; z-index:99;
     }
-    .res-badge { display:flex; align-items:center; gap:6px; }
-    .res-badge span { color:#38bdf8; font-size:14px; }
+    .lobby-card {
+      background:#0f172a; padding:24px; border-radius:14px; border:1px solid #334155;
+      text-align:center; color:#fff; width:340px; box-shadow:0 0 30px rgba(0,0,0,0.8);
+    }
+    .lobby-card input {
+      width:100%; padding:10px; margin:10px 0; border-radius:6px;
+      border:1px solid #475569; background:#1e293b; color:#fff; font-size:14px; text-align:center;
+    }
+    .lobby-card button {
+      width:100%; padding:10px; margin-top:6px; border-radius:6px;
+      border:none; background:#3b82f6; color:#fff; font-weight:bold; cursor:pointer; font-size:14px;
+    }
+    .lobby-card button:hover { background:#2563eb; }
 
-    /* Leaderboard */
+    #res { top:16px; left:16px; padding:10px 18px; display:flex; gap:16px; font-size:13px; font-weight:700; }
     #leaderboard { top:16px; right:16px; padding:12px 16px; min-width:170px; font-size:12px; }
-    #leaderboard h3 {
-      color:#fbbf24; font-size:12px; letter-spacing:1px; text-transform:uppercase;
-      border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:5px; margin-bottom:6px;
-    }
+    #leaderboard h3 { color:#fbbf24; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px; }
 
-    /* Health & Hunger Bars */
-    #stats { bottom:18px; left:18px; width:230px; padding:12px; }
-    .stat-row { display:flex; justify-content:space-between; font-size:11px; font-weight:700; margin-bottom:3px; }
-    .bar-bg { width:100%; height:12px; background:#1e293b; border-radius:6px; overflow:hidden; margin-bottom:8px; border:1px solid rgba(255,255,255,0.08); }
-    .bar-fill { height:100%; transition:width 0.2s ease-out; }
+    #stats { bottom:18px; left:18px; width:220px; padding:12px; }
+    .bar-bg { width:100%; height:12px; background:#1e293b; border-radius:6px; overflow:hidden; margin-top:4px; margin-bottom:8px; }
+    .bar-fill { height:100%; transition:width 0.15s ease-out; }
     .bar-hp { background:linear-gradient(90deg, #ef4444, #f87171); }
     .bar-hunger { background:linear-gradient(90deg, #f59e0b, #fbbf24); }
 
-    /* Crafting Menu */
-    #crafting {
-      right:18px; top:50%; transform:translateY(-50%);
-      padding:14px; display:flex; flex-direction:column; gap:8px; width:190px;
-    }
-    .craft-btn {
-      background:#1e293b; color:#f8fafc; border:1px solid #334155;
-      padding:9px 12px; border-radius:8px; font-size:11px; font-weight:700;
-      cursor:pointer; display:flex; justify-content:space-between; align-items:center;
-      transition:all 0.15s ease;
-    }
-    .craft-btn:hover:not(:disabled) { background:#3b82f6; border-color:#60a5fa; transform:translateX(-3px); }
-    .craft-btn:disabled { opacity:0.4; cursor:not-allowed; }
+    #crafting { right:18px; top:50%; transform:translateY(-50%); padding:12px; display:flex; flex-direction:column; gap:8px; width:180px; }
+    .craft-btn { background:#1e293b; color:#fff; border:1px solid #334155; padding:8px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; display:flex; justify-content:space-between; }
+    .craft-btn:hover:not(:disabled) { background:#3b82f6; }
+    .craft-btn:disabled { opacity:0.4; }
 
-    /* Minimap */
-    #minimap-wrap {
-      position:absolute; bottom:18px; right:18px; width:130px; height:130px;
-      border-radius:12px; overflow:hidden; border:2px solid rgba(255,255,255,0.2);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5); background:#152016;
-    }
-    #minimap { width:100%; height:100%; display:block; }
+    #room-tag { position:absolute; bottom:18px; right:18px; padding:8px 14px; font-size:12px; font-weight:bold; color:#38bdf8; }
   </style>
 </head>
 <body>
 
 <canvas id="canvas"></canvas>
 
+<!-- Lobby Modal -->
+<div id="lobby-modal" class="interactive">
+  <div class="lobby-card">
+    <h2 style="color:#38bdf8; margin-bottom:6px;">SURVIVE.IO</h2>
+    <p style="font-size:12px; color:#94a3b8; margin-bottom:14px;">साथ में खेलने के लिए रूम बनाएं या जॉइन करें</p>
+    <input type="text" id="p-name" placeholder="अपना नाम दर्ज करें" value="Player1">
+    <button onclick="multiplayer.hostRoom()">🏠 रूम होस्ट करें (Host Room)</button>
+    <div style="margin:12px 0; color:#64748b; font-size:12px;">— या कोड से जुड़ें —</div>
+    <input type="text" id="join-code" placeholder="रूम कोड (उदा: 5421)">
+    <button onclick="multiplayer.joinRoom()" style="background:#10b981;">🎮 रूम जॉइन करें (Join)</button>
+    <button onclick="multiplayer.playSolo()" style="background:#475569; margin-top:12px;">👤 अकेले खेलें (Solo Bots)</button>
+  </div>
+</div>
+
 <div id="ui">
-  <!-- Top Resources -->
   <div id="res" class="hud-box">
-    <div class="res-badge">🌲 लकड़ी: <span id="val-w">0</span></div>
-    <div class="res-badge">⛏️ पत्थर: <span id="val-s">0</span></div>
-    <div class="res-badge">🍎 भोजन: <span id="val-f">0</span></div>
+    <div>🌲 लकड़ी: <span id="val-w" style="color:#38bdf8">0</span></div>
+    <div>⛏️ पत्थर: <span id="val-s" style="color:#38bdf8">0</span></div>
+    <div>🍎 भोजन: <span id="val-f" style="color:#38bdf8">0</span></div>
   </div>
 
-  <!-- Leaderboard -->
   <div id="leaderboard" class="hud-box">
-    <h3>🏆 जीवित खिलाड़ी</h3>
-    <div id="lb-list"></div>
+    <h3>🏆 लाइव प्लेयर्स</h3>
+    <div id="lb-list">कनेक्टिंग...</div>
   </div>
 
-  <!-- Health & Hunger -->
   <div id="stats" class="hud-box">
-    <div class="stat-row"><span>स्वास्थ्य (HP)</span><span id="hp-txt">100/100</span></div>
+    <div style="font-size:11px; font-weight:bold;">स्वास्थ्य (HP) <span id="hp-txt" style="float:right;">100</span></div>
     <div class="bar-bg"><div id="hp-bar" class="bar-fill bar-hp" style="width:100%"></div></div>
-    
-    <div class="stat-row"><span>ऊर्जा (Hunger)</span><span id="hunger-txt">100%</span></div>
+    <div style="font-size:11px; font-weight:bold;">ऊर्जा (Hunger) <span id="hunger-txt" style="float:right;">100%</span></div>
     <div class="bar-bg"><div id="hunger-bar" class="bar-fill bar-hunger" style="width:100%"></div></div>
   </div>
 
-  <!-- Crafting Panel -->
   <div id="crafting" class="hud-box interactive">
-    <div style="font-size:11px; font-weight:800; color:#f59e0b; text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px;">उपकरण क्राफ्टिंग</div>
-    <button class="craft-btn" id="btn-eat" onclick="game.eat()"><span>🍎 सेब खाएं</span><small>+25 HP</small></button>
+    <div style="font-size:11px; font-weight:bold; color:#f59e0b;">🔨 क्राफ्टिंग</div>
+    <button class="craft-btn" id="btn-eat" onclick="game.eat()"><span>🍎 खाना खाएं</span><small>+25 HP</small></button>
     <button class="craft-btn" id="btn-pick" onclick="game.craft('pickaxe')"><span>⛏️ Pickaxe</span><small>15 Wood</small></button>
     <button class="craft-btn" id="btn-sword" onclick="game.craft('sword')"><span>⚔️ Sword</span><small>20W, 15S</small></button>
   </div>
 
-  <!-- MiniMap -->
-  <div id="minimap-wrap"><canvas id="minimap"></canvas></div>
+  <div id="room-tag" class="hud-box">Room: Solo</div>
 </div>
 
 <script>
 const canvas = document.getElementById('canvas');
 const ctx = canvas.getContext('2d');
-const mCanvas = document.getElementById('minimap');
-const mCtx = mCanvas.getContext('2d');
-
-function resize() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-  mCanvas.width = 130;
-  mCanvas.height = 130;
-}
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
 window.addEventListener('resize', resize);
 resize();
 
-const WORLD = 2600;
+const WORLD = 2400;
 
-// Web Audio API Sound Synthesizer
-const audio = new (window.AudioContext || window.webkitAudioContext)();
-function playFx(freq, type, duration) {
-  if (audio.state === 'suspended') audio.resume();
-  try {
-    const osc = audio.createOscillator();
-    const gain = audio.createGain();
-    osc.connect(gain); gain.connect(audio.destination);
-    const now = audio.currentTime;
-    osc.type = type || 'sine';
-    osc.frequency.setValueAtTime(freq, now);
-    osc.frequency.exponentialRampToValueAtTime(30, now + duration);
-    gain.gain.setValueAtTime(0.25, now);
-    gain.gain.linearRampToValueAtTime(0.01, now + duration);
-    osc.start(now); osc.stop(now + duration);
-  } catch(e){}
+class MultiplayerManager {
+  constructor() {
+    this.peer = null;
+    this.connections = [];
+    this.isHost = false;
+    this.roomCode = null;
+    this.networkPlayers = {};
+  }
+
+  hostRoom() {
+    const code = Math.floor(1000 + Math.random() * 9000).toString();
+    this.roomCode = code;
+    this.isHost = true;
+    this.peer = new Peer('survive-' + code);
+
+    this.peer.on('open', (id) => {
+      document.getElementById('lobby-modal').style.display = 'none';
+      document.getElementById('room-tag').innerText = 'रूम कोड: ' + code + ' (दोस्त को ये कोड दें)';
+      game.player.name = document.getElementById('p-name').value || 'Host';
+    });
+
+    this.peer.on('connection', (conn) => {
+      this.connections.push(conn);
+      conn.on('data', (data) => this.handleData(conn, data));
+      conn.on('open', () => {
+        // Send initial world to client
+        conn.send({ type: 'initWorld', resources: game.resources });
+      });
+    });
+
+    this.peer.on('error', () => alert('इस कोड से रूम नहीं बन पाया, दोबारा कोशिश करें!'));
+  }
+
+  joinRoom() {
+    const code = document.getElementById('join-code').value.trim();
+    if (!code) return alert('कृपया 4 अंकों का रूम कोड डालें!');
+    this.peer = new Peer();
+
+    this.peer.on('open', () => {
+      const conn = this.peer.connect('survive-' + code);
+      conn.on('open', () => {
+        this.connections.push(conn);
+        document.getElementById('lobby-modal').style.display = 'none';
+        document.getElementById('room-tag').innerText = 'जुड़े हुए रूम: ' + code;
+        game.player.name = document.getElementById('p-name').value || 'Client';
+        game.bots = []; // Remove bots in real multiplayer
+      });
+      conn.on('data', (data) => this.handleData(conn, data));
+    });
+
+    this.peer.on('error', () => alert('रूम नहीं मिला! चेक करें कि होस्ट ऑनलाइन है या कोड सही है।'));
+  }
+
+  playSolo() {
+    document.getElementById('lobby-modal').style.display = 'none';
+    game.player.name = document.getElementById('p-name').value || 'Player';
+  }
+
+  send(data) {
+    this.connections.forEach(conn => {
+      if (conn.open) conn.send(data);
+    });
+  }
+
+  handleData(conn, data) {
+    if (data.type === 'update') {
+      this.networkPlayers[data.id] = data.player;
+    } else if (data.type === 'initWorld') {
+      game.resources = data.resources;
+    }
+  }
 }
 
-class Engine {
+const multiplayer = new MultiplayerManager();
+
+class GameEngine {
   constructor() {
     this.mouse = { x: canvas.width/2, y: canvas.height/2, down: false };
     this.keys = {};
     this.player = {
       x: WORLD/2, y: WORLD/2, r: 24, angle: 0,
-      hp: 100, maxHp: 100, hunger: 100,
-      wood: 10, stone: 0, food: 6, score: 0,
-      weapon: 'fist', swing: 0
+      hp: 100, hunger: 100, wood: 10, stone: 0, food: 5, score: 0,
+      weapon: 'fist', swing: 0, name: 'Player'
     };
     this.resources = [];
     this.bots = [];
-    this.particles = [];
-    this.texts = [];
-
-    this.initWorld();
-    this.bindInputs();
+    this.init();
+    this.bind();
   }
 
-  initWorld() {
-    // Generate Rich Trees & Rocks
-    for (let i = 0; i < 85; i++) {
-      const isTree = Math.random() < 0.65;
+  init() {
+    for (let i = 0; i < 75; i++) {
       this.resources.push({
         id: i,
         x: Math.random() * (WORLD - 300) + 150,
         y: Math.random() * (WORLD - 300) + 150,
-        type: isTree ? 'tree' : 'rock',
-        r: isTree ? 36 : 28,
-        hp: isTree ? 80 : 100,
-        maxHp: isTree ? 80 : 100,
-        foliageOffsets: [Math.random()*6, Math.random()*6, Math.random()*6]
+        type: Math.random() < 0.65 ? 'tree' : 'rock',
+        r: 32, hp: 80
       });
     }
 
-    // Spawn 7 Smart Bots
-    const names = ['Krunker_King', 'Ninja_Pro', 'Surat_Boy', 'Shadow77', 'Viper', 'Aarav_01', 'Ghost'];
-    names.forEach((name, i) => {
+    const bnames = ['Ninja_Bot', 'Viper_Bot', 'Shadow_Bot'];
+    bnames.forEach(name => {
       this.bots.push({
-        name,
-        x: Math.random() * (WORLD - 400) + 200,
-        y: Math.random() * (WORLD - 400) + 200,
-        r: 24, angle: 0, hp: 100, maxHp: 100,
-        score: Math.floor(Math.random() * 50) + 10,
-        weapon: Math.random() < 0.5 ? 'pickaxe' : 'fist',
-        swing: 0, tx: Math.random() * WORLD, ty: Math.random() * WORLD, t: 0
+        name, x: Math.random()*WORLD, y: Math.random()*WORLD,
+        r: 24, angle: 0, hp: 100, score: 30, weapon: 'fist', swing: 0,
+        tx: Math.random()*WORLD, ty: Math.random()*WORLD, t: 0
       });
     });
   }
 
-  bindInputs() {
+  bind() {
     window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
     window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
-    window.addEventListener('mousemove', e => {
-      this.mouse.x = e.clientX;
-      this.mouse.y = e.clientY;
-    });
-    window.addEventListener('mousedown', () => {
-      this.mouse.down = true;
-      this.attack(this.player);
-    });
+    window.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    window.addEventListener('mousedown', () => { this.mouse.down = true; this.hit(this.player); });
     window.addEventListener('mouseup', () => this.mouse.down = false);
   }
 
-  attack(char) {
-    if (char.swing <= 0) {
-      char.swing = 1.0;
-      playFx(160, 'sawtooth', 0.1);
-    }
-  }
-
-  addText(x, y, txt, color) {
-    this.texts.push({ x, y, txt, color, alpha: 1.0, dy: -1.2 });
-  }
-
-  addParticles(x, y, color, count=5) {
-    for (let i = 0; i < count; i++) {
-      this.particles.push({
-        x, y,
-        vx: (Math.random()-0.5)*5, vy: (Math.random()-0.5)*5,
-        r: Math.random()*3 + 2, color, life: 1.0
-      });
-    }
+  hit(p) {
+    if (p.swing <= 0) p.swing = 1.0;
   }
 
   eat() {
-    if (this.player.food > 0 && (this.player.hp < 100 || this.player.hunger < 100)) {
+    if (this.player.food > 0 && this.player.hp < 100) {
       this.player.food--;
-      this.player.hunger = Math.min(100, this.player.hunger + 25);
-      this.player.hp = Math.min(100, this.player.hp + 20);
-      this.addText(this.player.x, this.player.y - 40, '+20 HP', '#4ade80');
-      playFx(450, 'triangle', 0.15);
+      this.player.hp = Math.min(100, this.player.hp + 25);
+      this.player.hunger = Math.min(100, this.player.hunger + 30);
       this.updateHUD();
     }
   }
 
   craft(type) {
-    if (type === 'pickaxe' && this.player.wood >= 15) {
-      this.player.wood -= 15;
-      this.player.weapon = 'pickaxe';
-      this.addText(this.player.x, this.player.y - 40, '⛏️ Pickaxe Unlocked!', '#38bdf8');
-      playFx(600, 'sine', 0.2);
-    } else if (type === 'sword' && this.player.wood >= 20 && this.player.stone >= 15) {
-      this.player.wood -= 20;
-      this.player.stone -= 15;
-      this.player.weapon = 'sword';
-      this.addText(this.player.x, this.player.y - 40, '⚔️ Sword Crafted!', '#f87171');
-      playFx(750, 'sine', 0.25);
-    }
+    if (type === 'pickaxe' && this.player.wood >= 15) { this.player.wood -= 15; this.player.weapon = 'pickaxe'; }
+    if (type === 'sword' && this.player.wood >= 20 && this.player.stone >= 15) { this.player.wood -= 20; this.player.stone -= 15; this.player.weapon = 'sword'; }
     this.updateHUD();
   }
 
   update() {
-    // Player Facing
     this.player.angle = Math.atan2(this.mouse.y - canvas.height/2, this.mouse.x - canvas.width/2);
-
-    // Movement
     let dx = 0, dy = 0;
     if (this.keys['w'] || this.keys['arrowup']) dy -= 1;
     if (this.keys['s'] || this.keys['arrowdown']) dy += 1;
     if (this.keys['a'] || this.keys['arrowleft']) dx -= 1;
     if (this.keys['d'] || this.keys['arrowright']) dx += 1;
-
     if (dx && dy) { dx *= 0.707; dy *= 0.707; }
-    const SPEED = 4.8;
-    this.player.x = Math.max(40, Math.min(WORLD - 40, this.player.x + dx * SPEED));
-    this.player.y = Math.max(40, Math.min(WORLD - 40, this.player.y + dy * SPEED));
 
-    // Hunger drain
-    this.player.hunger = Math.max(0, this.player.hunger - 0.012);
-    if (this.player.hunger === 0) {
-      this.player.hp = Math.max(0, this.player.hp - 0.03);
-    }
+    this.player.x = Math.max(30, Math.min(WORLD - 30, this.player.x + dx * 4.8));
+    this.player.y = Math.max(30, Math.min(WORLD - 30, this.player.y + dy * 4.8));
 
-    // Auto attack on hold
-    if (this.mouse.down && this.player.swing <= 0) this.attack(this.player);
+    this.player.hunger = Math.max(0, this.player.hunger - 0.01);
+    if (this.player.hunger === 0) this.player.hp = Math.max(0, this.player.hp - 0.03);
 
     if (this.player.swing > 0) {
       this.player.swing -= 0.16;
-      if (this.player.swing <= 0) this.resolveHit(this.player);
+      if (this.player.swing <= 0) this.resolveCombat(this.player);
+    }
+    if (this.mouse.down && this.player.swing <= 0) this.hit(this.player);
+
+    // Send my position to friends in room
+    if (multiplayer.peer) {
+      multiplayer.send({
+        type: 'update',
+        id: multiplayer.peer.id,
+        player: {
+          x: this.player.x, y: this.player.y, angle: this.player.angle,
+          weapon: this.player.weapon, swing: this.player.swing,
+          hp: this.player.hp, name: this.player.name, score: this.player.score
+        }
+      });
     }
 
-    // AI Bots Simulation
+    // Bots logic (only if solo)
     this.bots.forEach(b => {
       b.t++;
-      const dist = Math.hypot(this.player.x - b.x, this.player.y - b.y);
-      if (dist < 200) {
-        b.tx = this.player.x; b.ty = this.player.y;
-        if (dist < 60) this.attack(b);
-      } else if (b.t % 90 === 0) {
-        b.tx = b.x + (Math.random()-0.5)*400;
-        b.ty = b.y + (Math.random()-0.5)*400;
-      }
+      let d = Math.hypot(this.player.x - b.x, this.player.y - b.y);
+      if (d < 180) { b.tx = this.player.x; b.ty = this.player.y; if (d < 60) this.hit(b); }
+      else if (b.t % 90 === 0) { b.tx = b.x + (Math.random()-0.5)*300; b.ty = b.y + (Math.random()-0.5)*300; }
       b.angle = Math.atan2(b.ty - b.y, b.tx - b.x);
-      b.x += Math.cos(b.angle) * 2.3;
-      b.y += Math.sin(b.angle) * 2.3;
-
-      if (b.swing > 0) {
-        b.swing -= 0.16;
-        if (b.swing <= 0) this.resolveHit(b);
-      }
+      b.x += Math.cos(b.angle)*2.2; b.y += Math.sin(b.angle)*2.2;
+      if (b.swing > 0) { b.swing -= 0.16; if (b.swing <= 0) this.resolveCombat(b); }
     });
-
-    // Particles & Float Text
-    for (let i = this.particles.length - 1; i >= 0; i--) {
-      const p = this.particles[i];
-      p.x += p.vx; p.y += p.vy; p.life -= 0.04;
-      if (p.life <= 0) this.particles.splice(i, 1);
-    }
-
-    for (let i = this.texts.length - 1; i >= 0; i--) {
-      const t = this.texts[i];
-      t.y += t.dy; t.alpha -= 0.02;
-      if (t.alpha <= 0) this.texts.splice(i, 1);
-    }
 
     this.updateHUD();
   }
 
-  resolveHit(char) {
-    const reach = 55;
+  resolveCombat(char) {
+    const reach = 52;
     const hx = char.x + Math.cos(char.angle) * reach;
     const hy = char.y + Math.sin(char.angle) * reach;
 
-    // Check hit on trees/rocks
+    // Hit trees/stone
     for (let i = this.resources.length - 1; i >= 0; i--) {
-      const r = this.resources[i];
-      if (Math.hypot(hx - r.x, hy - r.y) < r.r + 18) {
-        let dmg = char.weapon === 'sword' ? 35 : char.weapon === 'pickaxe' ? 26 : 14;
+      let r = this.resources[i];
+      if (Math.hypot(hx - r.x, hy - r.y) < r.r + 20) {
+        let dmg = char.weapon === 'sword' ? 35 : char.weapon === 'pickaxe' ? 25 : 12;
         r.hp -= dmg;
-
-        this.addParticles(hx, hy, r.type === 'tree' ? '#4ade80' : '#cbd5e1', 6);
-        playFx(r.type === 'tree' ? 220 : 350, 'square', 0.08);
-
         if (char === this.player) {
-          if (r.type === 'tree') {
-            this.player.wood += 4;
-            this.addText(hx, hy - 15, '+4 Wood', '#4ade80');
-            if (Math.random() < 0.4) { this.player.food += 1; this.addText(hx + 10, hy - 30, '+1 Food', '#f87171'); }
-          } else {
-            this.player.stone += 3;
-            this.addText(hx, hy - 15, '+3 Stone', '#94a3b8');
-          }
+          if (r.type === 'tree') { this.player.wood += 4; if (Math.random()<0.35) this.player.food += 1; }
+          else { this.player.stone += 3; }
           this.player.score += 6;
         }
-
         if (r.hp <= 0) this.resources.splice(i, 1);
         break;
       }
     }
-
-    // Check hit on players/bots
-    const targets = char === this.player ? this.bots : [this.player];
-    targets.forEach(t => {
-      if (Math.hypot(hx - t.x, hy - t.y) < t.r + 20) {
-        let dmg = char.weapon === 'sword' ? 30 : char.weapon === 'pickaxe' ? 20 : 12;
-        t.hp -= dmg;
-        this.addParticles(hx, hy, '#ef4444', 8);
-        this.addText(t.x, t.y - 35, `-${dmg}`, '#ef4444');
-        playFx(120, 'sawtooth', 0.12);
-
-        if (t.hp <= 0) {
-          if (char === this.player) {
-            this.player.score += 50;
-            this.addText(t.x, t.y - 50, '+50 KILL!', '#fbbf24');
-          }
-          t.x = Math.random() * (WORLD - 400) + 200;
-          t.y = Math.random() * (WORLD - 400) + 200;
-          t.hp = 100;
-        }
-      }
-    });
   }
 
   updateHUD() {
     document.getElementById('val-w').innerText = this.player.wood;
     document.getElementById('val-s').innerText = this.player.stone;
     document.getElementById('val-f').innerText = this.player.food;
-
-    const hpPct = Math.max(0, Math.round(this.player.hp));
-    document.getElementById('hp-bar').style.width = hpPct + '%';
-    document.getElementById('hp-txt').innerText = `${hpPct}/100`;
-
-    const hunPct = Math.max(0, Math.round(this.player.hunger));
-    document.getElementById('hunger-bar').style.width = hunPct + '%';
-    document.getElementById('hunger-txt').innerText = `${hunPct}%`;
-
+    document.getElementById('hp-bar').style.width = Math.max(0, this.player.hp) + '%';
+    document.getElementById('hp-txt').innerText = Math.round(this.player.hp);
+    document.getElementById('hunger-bar').style.width = Math.max(0, this.player.hunger) + '%';
+    document.getElementById('hunger-txt').innerText = Math.round(this.player.hunger) + '%';
     document.getElementById('btn-pick').disabled = this.player.wood < 15;
     document.getElementById('btn-sword').disabled = (this.player.wood < 20 || this.player.stone < 15);
 
-    // Leaderboard
-    let list = [{ name: 'You (आप)', score: this.player.score, isYou: true }, ...this.bots];
+    let list = [{ name: this.player.name + ' (You)', score: this.player.score }];
+    for (let id in multiplayer.networkPlayers) {
+      let np = multiplayer.networkPlayers[id];
+      list.push({ name: np.name || 'Friend', score: np.score || 0 });
+    }
+    this.bots.forEach(b => list.push({ name: b.name, score: b.score }));
     list.sort((a,b) => b.score - a.score);
-    document.getElementById('lb-list').innerHTML = list.slice(0, 5).map((p, i) => `
-      <div style="display:flex; justify-content:space-between; margin-bottom:3px; color:${p.isYou ? '#38bdf8' : '#cbd5e1'}">
-        <span>${i+1}. ${p.name}</span><strong>${p.score}</strong>
-      </div>
-    `).join('');
+    document.getElementById('lb-list').innerHTML = list.slice(0, 5).map((p,i)=>`<div>${i+1}. ${p.name} <strong>${p.score}</strong></div>`).join('');
   }
 
   render() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    // Camera follow player
-    const cx = canvas.width / 2 - this.player.x;
-    const cy = canvas.height / 2 - this.player.y;
-
     ctx.save();
-    ctx.translate(cx, cy);
+    ctx.translate(canvas.width/2 - this.player.x, canvas.height/2 - this.player.y);
 
-    // 1. Grid Background
-    ctx.strokeStyle = '#222f20';
-    ctx.lineWidth = 1.5;
-    const STEP = 75;
-    for (let x = 0; x <= WORLD; x += STEP) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD); ctx.stroke(); }
-    for (let y = 0; y <= WORLD; y += STEP) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD, y); ctx.stroke(); }
+    // Map & Border
+    ctx.strokeStyle = '#222f20'; ctx.lineWidth = 1.5;
+    for (let x = 0; x <= WORLD; x += 75) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD); ctx.stroke(); }
+    for (let y = 0; y <= WORLD; y += 75) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD, y); ctx.stroke(); }
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 8; ctx.strokeRect(0, 0, WORLD, WORLD);
 
-    // Map Border
-    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 8;
-    ctx.strokeRect(0, 0, WORLD, WORLD);
-
-    // 2. Render Resources
+    // Trees & Stones
     this.resources.forEach(r => {
-      // Drop Shadow
-      ctx.fillStyle = 'rgba(0,0,0,0.35)';
-      ctx.beginPath(); ctx.arc(r.x + 6, r.y + 6, r.r, 0, Math.PI*2); ctx.fill();
-
-      if (r.type === 'tree') {
-        // Multi-layer stylized tree
-        ctx.fillStyle = '#166534';
-        ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2); ctx.fill();
-        
-        ctx.fillStyle = '#22c55e';
-        ctx.beginPath(); ctx.arc(r.x - 3, r.y - 3, r.r * 0.75, 0, Math.PI*2); ctx.fill();
-
-        ctx.fillStyle = '#4ade80';
-        ctx.beginPath(); ctx.arc(r.x - 6, r.y - 6, r.r * 0.45, 0, Math.PI*2); ctx.fill();
-      } else {
-        // Jagged Rock with Highlights
-        ctx.fillStyle = '#64748b';
-        ctx.beginPath();
-        for (let a = 0; a < Math.PI * 2; a += Math.PI / 4) {
-          let dist = r.r + Math.sin(a * 3) * 4;
-          let rx = r.x + Math.cos(a) * dist;
-          let ry = r.y + Math.sin(a) * dist;
-          if (a === 0) ctx.moveTo(rx, ry); else ctx.lineTo(rx, ry);
-        }
-        ctx.closePath(); ctx.fill();
-
-        ctx.fillStyle = '#94a3b8';
-        ctx.beginPath(); ctx.arc(r.x - 4, r.y - 4, r.r * 0.5, 0, Math.PI*2); ctx.fill();
-      }
+      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(r.x+5, r.y+5, r.r, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+      ctx.fillStyle = r.type === 'tree' ? '#22c55e' : '#94a3b8'; ctx.fill();
+      ctx.strokeStyle = r.type === 'tree' ? '#15803d' : '#475569'; ctx.lineWidth = 4; ctx.stroke();
     });
 
-    // 3. Render Particles
-    this.particles.forEach(p => {
-      ctx.fillStyle = p.color;
-      ctx.globalAlpha = p.life;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI*2); ctx.fill();
-      ctx.globalAlpha = 1.0;
-    });
+    // Real Online Friends
+    for (let id in multiplayer.networkPlayers) {
+      let np = multiplayer.networkPlayers[id];
+      this.drawChar(np, '#10b981', np.name || 'Friend');
+    }
 
-    // 4. Render Bots
-    this.bots.forEach(b => this.drawCharacter(b, '#f43f5e', b.name));
+    // Bots
+    this.bots.forEach(b => this.drawChar(b, '#ef4444', b.name));
 
-    // 5. Render Player
-    this.drawCharacter(this.player, '#0ea5e9', 'You (आप)');
-
-    // 6. Floating Numbers
-    this.texts.forEach(t => {
-      ctx.font = 'bold 15px sans-serif';
-      ctx.fillStyle = t.color;
-      ctx.globalAlpha = Math.max(0, t.alpha);
-      ctx.textAlign = 'center';
-      ctx.fillText(t.txt, t.x, t.y);
-      ctx.globalAlpha = 1.0;
-    });
-
+    // You
+    this.drawChar(this.player, '#0ea5e9', this.player.name + ' (You)');
     ctx.restore();
-
-    // 7. Render Mini-Map
-    this.renderMinimap();
   }
 
-  drawCharacter(char, color, name) {
+  drawChar(char, color, name) {
     ctx.save();
     ctx.translate(char.x, char.y);
-
-    // Drop Shadow
-    ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.beginPath(); ctx.arc(4, 4, char.r, 0, Math.PI*2); ctx.fill();
-
-    // Name & Health Bar Above Head
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(name, 0, -char.r - 14);
-
-    // Mini Health Bar
-    ctx.fillStyle = '#334155';
-    ctx.fillRect(-20, -char.r - 10, 40, 5);
-    ctx.fillStyle = '#ef4444';
-    ctx.fillRect(-20, -char.r - 10, (char.hp / char.maxHp) * 40, 5);
-
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, 0, -32);
     ctx.rotate(char.angle);
-
-    // Weapon Swing animation
-    const punch = char.swing > 0 ? 15 : 0;
-
-    // Right Hand & Weapon
-    ctx.save();
-    ctx.translate(char.r - 2 + punch, 13);
-
-    if (char.weapon === 'pickaxe') {
-      ctx.fillStyle = '#92400e'; ctx.fillRect(-3, -3, 22, 6);
-      ctx.fillStyle = '#94a3b8'; ctx.fillRect(16, -12, 6, 24);
-    } else if (char.weapon === 'sword') {
-      ctx.fillStyle = '#78350f'; ctx.fillRect(-3, -3, 10, 6);
-      ctx.fillStyle = '#f8fafc'; ctx.fillRect(7, -2, 26, 4);
-    }
-    // Hand fist
     ctx.fillStyle = '#f59e0b';
-    ctx.beginPath(); ctx.arc(0, 0, 8, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 2; ctx.stroke();
-    ctx.restore();
-
-    // Left Hand
-    ctx.fillStyle = '#f59e0b';
-    ctx.beginPath(); ctx.arc(char.r - 2, -13, 8, 0, Math.PI*2); ctx.fill();
-    ctx.strokeStyle = '#b45309'; ctx.lineWidth = 2; ctx.stroke();
-
-    // Body
-    ctx.beginPath(); ctx.arc(0, 0, char.r, 0, Math.PI*2);
-    ctx.fillStyle = color; ctx.fill();
+    let po = char.swing > 0 ? 12 : 0;
+    ctx.beginPath(); ctx.arc(20 + po, 12, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(20, -12, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, char.r, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
     ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3.5; ctx.stroke();
-
     ctx.restore();
-  }
-
-  renderMinimap() {
-    mCtx.clearRect(0, 0, 130, 130);
-    const scale = 130 / WORLD;
-
-    // Resources
-    mCtx.fillStyle = '#166534';
-    this.resources.forEach(r => {
-      mCtx.fillRect(r.x * scale, r.y * scale, 2, 2);
-    });
-
-    // Bots (Red dots)
-    mCtx.fillStyle = '#ef4444';
-    this.bots.forEach(b => {
-      mCtx.fillRect(b.x * scale - 1, b.y * scale - 1, 3, 3);
-    });
-
-    // You (Bright Blue dot)
-    mCtx.fillStyle = '#38bdf8';
-    mCtx.beginPath();
-    mCtx.arc(this.player.x * scale, this.player.y * scale, 3.5, 0, Math.PI*2);
-    mCtx.fill();
   }
 
   loop() {
@@ -568,7 +396,7 @@ class Engine {
   }
 }
 
-const game = new Engine();
+const game = new GameEngine();
 game.loop();
 </script>
 </body>
