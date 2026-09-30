@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>SURVIVE.IO ORIGINAL</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
+    body, html { width:100%; height:100%; overflow:hidden; background:#0d1117; font-family:'Segoe UI', sans-serif; }
+    #canvas { display:block; width:100vw; height:100vh; }
+    #ui { position:absolute; inset:0; pointer-events:none; }
+    .hud { position:absolute; background:rgba(18, 22, 28, 0.88); border:1px solid rgba(255,255,255,0.12); backdrop-filter:blur(6px); border-radius:10px; color:#fff; }
+    #stats { bottom:20px; left:20px; width:220px; padding:12px; }
+    .bar-bg { width:100%; height:14px; background:#222; border-radius:7px; overflow:hidden; margin-top:5px; position:relative; }
+    .bar-fill { height:100%; width:100%; transition:width 0.15s ease-out; }
+    .bar-hp { background:linear-gradient(90deg, #ff416c, #ff4b2b); }
+    .bar-hunger { background:linear-gradient(90deg, #f59e0b, #fbbf24); }
+    .bar-text { position:absolute; inset:0; font-size:10px; font-weight:bold; display:flex; align-items:center; justify-content:center; text-shadow:1px 1px 2px #000; }
+    #res { top:20px; left:20px; padding:10px 16px; display:flex; gap:12px; font-weight:bold; font-size:14px; }
+    #leaderboard { top:20px; right:20px; padding:10px 14px; min-width:160px; font-size:12px; }
+    #leaderboard h3 { color:#f59e0b; margin-bottom:5px; font-size:13px; text-transform:uppercase; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:3px; }
+    #crafting { right:20px; top:50%; transform:translateY(-50%); padding:12px; display:flex; flex-direction:column; gap:8px; pointer-events:auto; }
+    .btn { background:#1e293b; color:#fff; border:1px solid #334155; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:bold; cursor:pointer; }
+    .btn:hover { background:#3b82f6; }
+    .btn:disabled { opacity:0.4; cursor:not-allowed; }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="ui">
+  <div id="res" class="hud">
+    <div>🪵 <span id="val-w">0</span></div>
+    <div>🪨 <span id="val-s">0</span></div>
+    <div>🍎 <span id="val-f">0</span></div>
+  </div>
+  <div id="leaderboard" class="hud">
+    <h3>🏆 Survivors</h3>
+    <div id="lb-list"></div>
+  </div>
+  <div id="stats" class="hud">
+    <div style="font-size:11px; font-weight:bold;">स्वास्थ्य (HP)</div>
+    <div class="bar-bg"><div id="hp-bar" class="bar-fill bar-hp"></div><div id="hp-txt" class="bar-text">100</div></div>
+    <div style="font-size:11px; font-weight:bold; margin-top:6px;">भूख (HUNGER)</div>
+    <div class="bar-bg"><div id="hunger-bar" class="bar-fill bar-hunger"></div><div id="hunger-txt" class="bar-text">100</div></div>
+  </div>
+  <div id="crafting" class="hud">
+    <div style="font-size:11px; font-weight:bold; color:#f59e0b;">🔨 क्राफ्टिंग</div>
+    <button class="btn" id="btn-eat" onclick="game.eat()">🍎 खाना खाएं (1 Food)</button>
+    <button class="btn" id="btn-pick" onclick="game.craft('pickaxe')">⛏️ Pickaxe (15 Wood)</button>
+    <button class="btn" id="btn-sword" onclick="game.craft('sword')">⚔️ Sword (20W, 15S)</button>
+  </div>
+</div>
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resize);
+resize();
+
+const WORLD = 2400;
+class Engine {
+  constructor() {
+    this.mouse = { x: canvas.width/2, y: canvas.height/2, down: false };
+    this.keys = {};
+    this.player = { x: 1200, y: 1200, r: 22, angle: 0, hp: 100, hunger: 100, wood: 10, stone: 0, food: 5, score: 0, weapon: 'fist', swing: 0 };
+    this.resources = [];
+    this.bots = [];
+    this.init();
+    this.bind();
+  }
+  init() {
+    for (let i = 0; i < 90; i++) {
+      this.resources.push({ id: i, x: Math.random()*(WORLD-200)+100, y: Math.random()*(WORLD-200)+100, type: Math.random()<0.6?'tree':'rock', hp: 60, r: 26 });
+    }
+    const names = ['KrunkerPro', 'Shadow_BR', 'Vikram99', 'Alex_07', 'GamerBoy', 'SilentWolf', 'SuratKing'];
+    names.forEach((name, i) => {
+      this.bots.push({ name, x: Math.random()*WORLD, y: Math.random()*WORLD, r: 22, angle: 0, hp: 100, score: Math.floor(Math.random()*40), weapon: Math.random()<0.5?'pickaxe':'fist', swing: 0, tx: Math.random()*WORLD, ty: Math.random()*WORLD, t: 0 });
+    });
+  }
+  bind() {
+    window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
+    window.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
+    window.addEventListener('mousedown', () => { this.mouse.down = true; this.hit(this.player); });
+    window.addEventListener('mouseup', () => this.mouse.down = false);
+  }
+  hit(p) {
+    if (p.swing <= 0) p.swing = 1.0;
+  }
+  eat() {
+    if (this.player.food > 0) {
+      this.player.food--;
+      this.player.hunger = Math.min(100, this.player.hunger + 25);
+      this.player.hp = Math.min(100, this.player.hp + 15);
+      this.updateHUD();
+    }
+  }
+  craft(item) {
+    if (item === 'pickaxe' && this.player.wood >= 15) { this.player.wood -= 15; this.player.weapon = 'pickaxe'; }
+    if (item === 'sword' && this.player.wood >= 20 && this.player.stone >= 15) { this.player.wood -= 20; this.player.stone -= 15; this.player.weapon = 'sword'; }
+    this.updateHUD();
+  }
+  update() {
+    this.player.angle = Math.atan2(this.mouse.y - canvas.height/2, this.mouse.x - canvas.width/2);
+    let dx = 0, dy = 0;
+    if (this.keys['w'] || this.keys['arrowup']) dy -= 1;
+    if (this.keys['s'] || this.keys['arrowdown']) dy += 1;
+    if (this.keys['a'] || this.keys['arrowleft']) dx -= 1;
+    if (this.keys['d'] || this.keys['arrowright']) dx += 1;
+    if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+    this.player.x = Math.max(30, Math.min(WORLD-30, this.player.x + dx * 4.5));
+    this.player.y = Math.max(30, Math.min(WORLD-30, this.player.y + dy * 4.5));
+    this.player.hunger = Math.max(0, this.player.hunger - 0.01);
+    if (this.player.hunger === 0) this.player.hp = Math.max(0, this.player.hp - 0.03);
+
+    if (this.player.swing > 0) {
+      this.player.swing -= 0.15;
+      if (this.player.swing <= 0) this.checkCollision(this.player);
+    }
+    if (this.mouse.down && this.player.swing <= 0) this.hit(this.player);
+
+    this.bots.forEach(b => {
+      b.t++;
+      let d = Math.hypot(this.player.x - b.x, this.player.y - b.y);
+      if (d < 220) { b.tx = this.player.x; b.ty = this.player.y; if (d < 60) this.hit(b); }
+      else if (b.t % 100 === 0) { b.tx = b.x + (Math.random()-0.5)*300; b.ty = b.y + (Math.random()-0.5)*300; }
+      b.angle = Math.atan2(b.ty - b.y, b.tx - b.x);
+      b.x += Math.cos(b.angle) * 2.2; b.y += Math.sin(b.angle) * 2.2;
+      if (b.swing > 0) { b.swing -= 0.15; if (b.swing <= 0) this.checkCollision(b); }
+    });
+    this.updateHUD();
+  }
+  checkCollision(char) {
+    let reach = 50;
+    let hx = char.x + Math.cos(char.angle)*reach, hy = char.y + Math.sin(char.angle)*reach;
+    for (let i = this.resources.length-1; i >= 0; i--) {
+      let r = this.resources[i];
+      if (Math.hypot(hx - r.x, hy - r.y) < r.r + 20) {
+        let dmg = char.weapon === 'sword' ? 30 : char.weapon === 'pickaxe' ? 22 : 12;
+        r.hp -= dmg;
+        if (char === this.player) {
+          if (r.type === 'tree') { this.player.wood += 4; if (Math.random()<0.4) this.player.food += 1; }
+          else { this.player.stone += 3; }
+          this.player.score += 5;
+        }
+        if (r.hp <= 0) this.resources.splice(i, 1);
+        break;
+      }
+    }
+    let targets = char === this.player ? this.bots : [this.player];
+    targets.forEach(t => {
+      if (Math.hypot(hx - t.x, hy - t.y) < t.r + 20) {
+        t.hp -= (char.weapon === 'sword' ? 28 : char.weapon === 'pickaxe' ? 18 : 10);
+        if (t.hp <= 0) {
+          if (char === this.player) this.player.score += 50;
+          t.x = Math.random()*WORLD; t.y = Math.random()*WORLD; t.hp = 100;
+        }
+      }
+    });
+  }
+  updateHUD() {
+    document.getElementById('val-w').innerText = this.player.wood;
+    document.getElementById('val-s').innerText = this.player.stone;
+    document.getElementById('val-f').innerText = this.player.food;
+    document.getElementById('hp-bar').style.width = this.player.hp + '%';
+    document.getElementById('hp-txt').innerText = Math.round(this.player.hp);
+    document.getElementById('hunger-bar').style.width = this.player.hunger + '%';
+    document.getElementById('hunger-txt').innerText = Math.round(this.player.hunger);
+    document.getElementById('btn-pick').disabled = this.player.wood < 15;
+    document.getElementById('btn-sword').disabled = (this.player.wood < 20 || this.player.stone < 15);
+    let list = [{ name: 'You (आप)', score: this.player.score }, ...this.bots];
+    list.sort((a,b) => b.score - a.score);
+    document.getElementById('lb-list').innerHTML = list.slice(0, 5).map((p,i)=>`<div>${i+1}. ${p.name}: <span style="color:#60a5fa">${p.score}</span></div>`).join('');
+  }
+  render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.save();
+    ctx.translate(canvas.width/2 - this.player.x, canvas.height/2 - this.player.y);
+    ctx.strokeStyle = '#1e293b'; ctx.lineWidth = 1.5;
+    for (let x = 0; x < WORLD; x += 60) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,WORLD); ctx.stroke(); }
+    for (let y = 0; y < WORLD; y += 60) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(WORLD,y); ctx.stroke(); }
+    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 6; ctx.strokeRect(0, 0, WORLD, WORLD);
+
+    this.resources.forEach(r => {
+      ctx.fillStyle = 'rgba(0,0,0,0.25)'; ctx.beginPath(); ctx.arc(r.x+5, r.y+5, r.r, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
+      ctx.fillStyle = r.type === 'tree' ? '#22c55e' : '#94a3b8'; ctx.fill();
+      ctx.strokeStyle = r.type === 'tree' ? '#15803d' : '#475569'; ctx.lineWidth = 3; ctx.stroke();
+    });
+
+    this.bots.forEach(b => this.drawChar(b, '#f43f5e', b.name));
+    this.drawChar(this.player, '#38bdf8', 'You (आप)');
+    ctx.restore();
+  }
+  drawChar(p, col, name) {
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, 0, -32);
+    ctx.rotate(p.angle);
+    ctx.fillStyle = '#f59e0b';
+    let po = p.swing > 0 ? 12 : 0;
+    ctx.beginPath(); ctx.arc(20 + po, 12, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(20, -12, 7, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(0, 0, p.r, 0, Math.PI*2); ctx.fillStyle = col; ctx.fill();
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3; ctx.stroke();
+    ctx.restore();
+  }
+  loop() { this.update(); this.render(); requestAnimationFrame(() => this.loop()); }
+}
+const game = new Engine();
+game.loop();
+</script>
+</body>
+</html>
