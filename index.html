@@ -3,401 +3,492 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>SURVIVE.IO - REAL MULTIPLAYER</title>
-  <!-- Free PeerJS Library for direct device-to-device multiplayer -->
+  <title>SURVIVAL 3D - REAL OPEN WORLD</title>
+  <!-- 3D Graphics Engine & PeerJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     * { margin:0; padding:0; box-sizing:border-box; user-select:none; }
-    body, html { width:100%; height:100%; overflow:hidden; background:#172216; font-family:'Segoe UI', sans-serif; }
-    #canvas { display:block; width:100vw; height:100vh; }
+    body, html { width:100%; height:100%; overflow:hidden; background:#000; font-family:'Segoe UI', sans-serif; }
+    #canvas3d { width:100vw; height:100vh; display:block; }
+    
     #ui { position:absolute; inset:0; pointer-events:none; }
     .interactive { pointer-events:auto; }
 
+    /* Crosshair */
+    #crosshair {
+      position:absolute; top:50%; left:50%; width:8px; height:8px;
+      background:rgba(255,255,255,0.7); border-radius:50%;
+      transform:translate(-50%, -50%); border:1px solid rgba(0,0,0,0.5);
+    }
+
     .hud-box {
       position:absolute; background:rgba(15, 23, 42, 0.85);
-      border:1px solid rgba(255, 255, 255, 0.15);
-      box-shadow: 0 8px 24px rgba(0,0,0,0.5); backdrop-filter:blur(8px);
+      border:1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.6); backdrop-filter:blur(8px);
       border-radius:12px; color:#fff;
     }
 
-    /* Lobby Join Screen */
-    #lobby-modal {
-      position:absolute; inset:0; background:rgba(0,0,0,0.8);
-      display:flex; justify-content:center; align-items:center; z-index:99;
-    }
-    .lobby-card {
-      background:#0f172a; padding:24px; border-radius:14px; border:1px solid #334155;
-      text-align:center; color:#fff; width:340px; box-shadow:0 0 30px rgba(0,0,0,0.8);
-    }
-    .lobby-card input {
-      width:100%; padding:10px; margin:10px 0; border-radius:6px;
-      border:1px solid #475569; background:#1e293b; color:#fff; font-size:14px; text-align:center;
-    }
-    .lobby-card button {
-      width:100%; padding:10px; margin-top:6px; border-radius:6px;
-      border:none; background:#3b82f6; color:#fff; font-weight:bold; cursor:pointer; font-size:14px;
-    }
-    .lobby-card button:hover { background:#2563eb; }
+    #res { top:16px; left:16px; padding:12px 20px; display:flex; gap:18px; font-size:14px; font-weight:800; }
+    .res-val { color:#38bdf8; }
 
-    #res { top:16px; left:16px; padding:10px 18px; display:flex; gap:16px; font-size:13px; font-weight:700; }
-    #leaderboard { top:16px; right:16px; padding:12px 16px; min-width:170px; font-size:12px; }
-    #leaderboard h3 { color:#fbbf24; border-bottom:1px solid rgba(255,255,255,0.1); padding-bottom:4px; margin-bottom:6px; }
-
-    #stats { bottom:18px; left:18px; width:220px; padding:12px; }
-    .bar-bg { width:100%; height:12px; background:#1e293b; border-radius:6px; overflow:hidden; margin-top:4px; margin-bottom:8px; }
-    .bar-fill { height:100%; transition:width 0.15s ease-out; }
+    #stats { bottom:20px; left:20px; width:220px; padding:14px; }
+    .bar-bg { width:100%; height:12px; background:#1e293b; border-radius:6px; overflow:hidden; margin:4px 0 8px; }
+    .bar-fill { height:100%; transition:width 0.2s; }
     .bar-hp { background:linear-gradient(90deg, #ef4444, #f87171); }
     .bar-hunger { background:linear-gradient(90deg, #f59e0b, #fbbf24); }
 
-    #crafting { right:18px; top:50%; transform:translateY(-50%); padding:12px; display:flex; flex-direction:column; gap:8px; width:180px; }
-    .craft-btn { background:#1e293b; color:#fff; border:1px solid #334155; padding:8px 10px; border-radius:6px; font-size:11px; font-weight:bold; cursor:pointer; display:flex; justify-content:space-between; }
-    .craft-btn:hover:not(:disabled) { background:#3b82f6; }
-    .craft-btn:disabled { opacity:0.4; }
+    #crafting { right:20px; top:50%; transform:translateY(-50%); padding:14px; display:flex; flex-direction:column; gap:8px; width:180px; }
+    .c-btn { background:#1e293b; color:#fff; border:1px solid #475569; padding:9px 12px; border-radius:8px; font-size:12px; font-weight:bold; cursor:pointer; display:flex; justify-content:space-between; }
+    .c-btn:hover:not(:disabled) { background:#3b82f6; border-color:#60a5fa; }
+    .c-btn:disabled { opacity:0.35; cursor:not-allowed; }
 
-    #room-tag { position:absolute; bottom:18px; right:18px; padding:8px 14px; font-size:12px; font-weight:bold; color:#38bdf8; }
+    #room-tag { position:absolute; bottom:20px; right:20px; padding:8px 16px; font-size:13px; font-weight:bold; color:#38bdf8; }
+
+    /* Lobby */
+    #lobby {
+      position:absolute; inset:0; background:rgba(10,15,25,0.85);
+      display:flex; justify-content:center; align-items:center; z-index:100;
+    }
+    .card { background:#0f172a; padding:28px; border-radius:16px; border:1px solid #334155; width:340px; text-align:center; color:#fff; }
+    .card input { width:100%; padding:10px; margin:8px 0; border-radius:8px; border:1px solid #475569; background:#1e293b; color:#fff; text-align:center; }
+    .card button { width:100%; padding:11px; margin-top:6px; border-radius:8px; border:none; font-weight:bold; cursor:pointer; color:#fff; font-size:14px; }
   </style>
 </head>
 <body>
 
-<canvas id="canvas"></canvas>
+<canvas id="canvas3d"></canvas>
+<div id="crosshair"></div>
 
-<!-- Lobby Modal -->
-<div id="lobby-modal" class="interactive">
-  <div class="lobby-card">
-    <h2 style="color:#38bdf8; margin-bottom:6px;">SURVIVE.IO</h2>
-    <p style="font-size:12px; color:#94a3b8; margin-bottom:14px;">साथ में खेलने के लिए रूम बनाएं या जॉइन करें</p>
-    <input type="text" id="p-name" placeholder="अपना नाम दर्ज करें" value="Player1">
-    <button onclick="multiplayer.hostRoom()">🏠 रूम होस्ट करें (Host Room)</button>
-    <div style="margin:12px 0; color:#64748b; font-size:12px;">— या कोड से जुड़ें —</div>
-    <input type="text" id="join-code" placeholder="रूम कोड (उदा: 5421)">
-    <button onclick="multiplayer.joinRoom()" style="background:#10b981;">🎮 रूम जॉइन करें (Join)</button>
-    <button onclick="multiplayer.playSolo()" style="background:#475569; margin-top:12px;">👤 अकेले खेलें (Solo Bots)</button>
+<!-- Multiplayer Lobby -->
+<div id="lobby" class="interactive">
+  <div class="card">
+    <h2 style="color:#38bdf8; margin-bottom:4px;">SURVIVAL 3D</h2>
+    <p style="font-size:12px; color:#94a3b8; margin-bottom:12px;">Real-World Open 3D Environment</p>
+    <input type="text" id="pname" placeholder="खिलाड़ी का नाम" value="Player1">
+    <button onclick="net.host()" style="background:#2563eb;">🏠 3D रूम होस्ट करें (Host)</button>
+    <div style="margin:10px 0; font-size:12px; color:#64748b;">— या कोड से जुड़ें —</div>
+    <input type="text" id="jcode" placeholder="4-digit रूम कोड">
+    <button onclick="net.join()" style="background:#059669;">🎮 रूम में प्रवेश करें (Join)</button>
+    <button onclick="net.solo()" style="background:#475569; margin-top:10px;">👤 अकेले घूमें (Solo)</button>
   </div>
 </div>
 
 <div id="ui">
   <div id="res" class="hud-box">
-    <div>🌲 लकड़ी: <span id="val-w" style="color:#38bdf8">0</span></div>
-    <div>⛏️ पत्थर: <span id="val-s" style="color:#38bdf8">0</span></div>
-    <div>🍎 भोजन: <span id="val-f" style="color:#38bdf8">0</span></div>
-  </div>
-
-  <div id="leaderboard" class="hud-box">
-    <h3>🏆 लाइव प्लेयर्स</h3>
-    <div id="lb-list">कनेक्टिंग...</div>
+    <div>🌲 लकड़ी: <span id="vw" class="res-val">0</span></div>
+    <div>⛏️ पत्थर: <span id="vs" class="res-val">0</span></div>
+    <div>🍎 भोजन: <span id="vf" class="res-val">5</span></div>
   </div>
 
   <div id="stats" class="hud-box">
-    <div style="font-size:11px; font-weight:bold;">स्वास्थ्य (HP) <span id="hp-txt" style="float:right;">100</span></div>
-    <div class="bar-bg"><div id="hp-bar" class="bar-fill bar-hp" style="width:100%"></div></div>
-    <div style="font-size:11px; font-weight:bold;">ऊर्जा (Hunger) <span id="hunger-txt" style="float:right;">100%</span></div>
-    <div class="bar-bg"><div id="hunger-bar" class="bar-fill bar-hunger" style="width:100%"></div></div>
+    <div style="font-size:11px; font-weight:bold;">स्वास्थ्य (HP) <span id="hp-t" style="float:right;">100</span></div>
+    <div class="bar-bg"><div id="hp-b" class="bar-fill bar-hp" style="width:100%"></div></div>
+    <div style="font-size:11px; font-weight:bold;">ऊर्जा (Hunger) <span id="hun-t" style="float:right;">100%</span></div>
+    <div class="bar-bg"><div id="hun-b" class="bar-fill bar-hunger" style="width:100%"></div></div>
   </div>
 
   <div id="crafting" class="hud-box interactive">
-    <div style="font-size:11px; font-weight:bold; color:#f59e0b;">🔨 क्राफ्टिंग</div>
-    <button class="craft-btn" id="btn-eat" onclick="game.eat()"><span>🍎 खाना खाएं</span><small>+25 HP</small></button>
-    <button class="craft-btn" id="btn-pick" onclick="game.craft('pickaxe')"><span>⛏️ Pickaxe</span><small>15 Wood</small></button>
-    <button class="craft-btn" id="btn-sword" onclick="game.craft('sword')"><span>⚔️ Sword</span><small>20W, 15S</small></button>
+    <div style="font-size:11px; font-weight:bold; color:#f59e0b; margin-bottom:4px;">🔨 क्राफ्टिंग</div>
+    <button class="c-btn" onclick="world.eat()"><span>🍎 सेब खाएं</span><small>+25 HP</small></button>
+    <button class="c-btn" id="b-pick" onclick="world.craft('pickaxe')"><span>⛏️ Pickaxe</span><small>15 Wood</small></button>
+    <button class="c-btn" id="b-sw" onclick="world.craft('sword')"><span>⚔️ Sword</span><small>20W, 15S</small></button>
   </div>
 
-  <div id="room-tag" class="hud-box">Room: Solo</div>
+  <div id="room-tag" class="hud-box">3D World: Solo</div>
 </div>
 
 <script>
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
-function resize() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
-window.addEventListener('resize', resize);
-resize();
-
-const WORLD = 2400;
-
-class MultiplayerManager {
+// 1. PeerJS Multiplayer Bridge
+class NetManager {
   constructor() {
     this.peer = null;
-    this.connections = [];
-    this.isHost = false;
-    this.roomCode = null;
-    this.networkPlayers = {};
+    this.conn = null;
+    this.otherPlayers = {};
   }
-
-  hostRoom() {
+  host() {
     const code = Math.floor(1000 + Math.random() * 9000).toString();
-    this.roomCode = code;
-    this.isHost = true;
-    this.peer = new Peer('survive-' + code);
-
-    this.peer.on('open', (id) => {
-      document.getElementById('lobby-modal').style.display = 'none';
-      document.getElementById('room-tag').innerText = 'रूम कोड: ' + code + ' (दोस्त को ये कोड दें)';
-      game.player.name = document.getElementById('p-name').value || 'Host';
-    });
-
-    this.peer.on('connection', (conn) => {
-      this.connections.push(conn);
-      conn.on('data', (data) => this.handleData(conn, data));
-      conn.on('open', () => {
-        // Send initial world to client
-        conn.send({ type: 'initWorld', resources: game.resources });
-      });
-    });
-
-    this.peer.on('error', () => alert('इस कोड से रूम नहीं बन पाया, दोबारा कोशिश करें!'));
-  }
-
-  joinRoom() {
-    const code = document.getElementById('join-code').value.trim();
-    if (!code) return alert('कृपया 4 अंकों का रूम कोड डालें!');
-    this.peer = new Peer();
-
+    this.peer = new Peer('s3d-' + code);
     this.peer.on('open', () => {
-      const conn = this.peer.connect('survive-' + code);
-      conn.on('open', () => {
-        this.connections.push(conn);
-        document.getElementById('lobby-modal').style.display = 'none';
-        document.getElementById('room-tag').innerText = 'जुड़े हुए रूम: ' + code;
-        game.player.name = document.getElementById('p-name').value || 'Client';
-        game.bots = []; // Remove bots in real multiplayer
+      document.getElementById('lobby').style.display = 'none';
+      document.getElementById('room-tag').innerText = 'रूम कोड: ' + code;
+      world.initAudio();
+    });
+    this.peer.on('connection', (c) => {
+      this.conn = c;
+      c.on('data', d => this.receive(d));
+    });
+  }
+  join() {
+    const code = document.getElementById('jcode').value.trim();
+    if (!code) return alert('कोड दर्ज करें!');
+    this.peer = new Peer();
+    this.peer.on('open', () => {
+      this.conn = this.peer.connect('s3d-' + code);
+      this.conn.on('open', () => {
+        document.getElementById('lobby').style.display = 'none';
+        document.getElementById('room-tag').innerText = 'रूम: ' + code;
+        world.initAudio();
       });
-      conn.on('data', (data) => this.handleData(conn, data));
+      this.conn.on('data', d => this.receive(d));
     });
-
-    this.peer.on('error', () => alert('रूम नहीं मिला! चेक करें कि होस्ट ऑनलाइन है या कोड सही है।'));
   }
-
-  playSolo() {
-    document.getElementById('lobby-modal').style.display = 'none';
-    game.player.name = document.getElementById('p-name').value || 'Player';
+  solo() {
+    document.getElementById('lobby').style.display = 'none';
+    world.initAudio();
   }
-
   send(data) {
-    this.connections.forEach(conn => {
-      if (conn.open) conn.send(data);
-    });
+    if (this.conn && this.conn.open) this.conn.send(data);
   }
-
-  handleData(conn, data) {
-    if (data.type === 'update') {
-      this.networkPlayers[data.id] = data.player;
-    } else if (data.type === 'initWorld') {
-      game.resources = data.resources;
+  receive(data) {
+    if (data.type === 'pos') {
+      world.updateRemotePlayer(data);
     }
   }
 }
+const net = new NetManager();
 
-const multiplayer = new MultiplayerManager();
-
-class GameEngine {
+// 2. Three.js Full 3D Real-World Engine
+class World3D {
   constructor() {
-    this.mouse = { x: canvas.width/2, y: canvas.height/2, down: false };
+    this.container = document.getElementById('canvas3d');
+    this.res = { wood: 0, stone: 0, food: 5, hp: 100, hunger: 100, weapon: 'fist' };
+    
+    // Scene, Camera, Renderer
+    this.scene = new THREE.Scene();
+    this.scene.background = new THREE.Color(0x87ceeb); // Real Sky Blue
+    this.scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+    this.camera = new THREE.PerspectiveCamera(65, window.innerWidth / window.innerHeight, 0.1, 1000);
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.container, antialias: true });
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.shadowMap.enabled = true;
+
+    // Lights
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0x445533, 0.7);
+    this.scene.add(hemiLight);
+
+    this.sun = new THREE.DirectionalLight(0xfffaed, 0.9);
+    this.sun.position.set(60, 100, 40);
+    this.sun.castShadow = true;
+    this.scene.add(this.sun);
+
+    // Objects
+    this.trees = [];
+    this.rocks = [];
+    this.particles = [];
+    this.remoteMesh = null;
+
     this.keys = {};
-    this.player = {
-      x: WORLD/2, y: WORLD/2, r: 24, angle: 0,
-      hp: 100, hunger: 100, wood: 10, stone: 0, food: 5, score: 0,
-      weapon: 'fist', swing: 0, name: 'Player'
-    };
-    this.resources = [];
-    this.bots = [];
-    this.init();
-    this.bind();
+    this.mouseRot = { yaw: 0, pitch: 0 };
+    this.swinging = false;
+    this.swingProgress = 0;
+
+    this.buildTerrain();
+    this.buildPlayer();
+    this.populateWorld();
+    this.bindEvents();
   }
 
-  init() {
-    for (let i = 0; i < 75; i++) {
-      this.resources.push({
-        id: i,
-        x: Math.random() * (WORLD - 300) + 150,
-        y: Math.random() * (WORLD - 300) + 150,
-        type: Math.random() < 0.65 ? 'tree' : 'rock',
-        r: 32, hp: 80
-      });
+  initAudio() {
+    this.actx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+
+  playBeep(f, dur) {
+    if (!this.actx) return;
+    const osc = this.actx.createOscillator();
+    const g = this.actx.createGain();
+    osc.connect(g); g.connect(this.actx.destination);
+    osc.frequency.setValueAtTime(f, this.actx.currentTime);
+    g.gain.setValueAtTime(0.2, this.actx.currentTime);
+    g.gain.linearRampToValueAtTime(0.01, this.actx.currentTime + dur);
+    osc.start(); osc.stop(this.actx.currentTime + dur);
+  }
+
+  buildTerrain() {
+    // 3D Grassy Ground
+    const geo = new THREE.PlaneGeometry(300, 300, 40, 40);
+    geo.rotateX(-Math.PI / 2);
+    const mat = new THREE.MeshLambertMaterial({ color: 0x3d7e35 });
+    const ground = new THREE.Mesh(geo, mat);
+    ground.receiveShadow = true;
+    this.scene.add(ground);
+
+    // World Fence/Border
+    const wallGeo = new THREE.BoxGeometry(300, 4, 2);
+    const wallMat = new THREE.MeshLambertMaterial({ color: 0xb91c1c });
+    const w1 = new THREE.Mesh(wallGeo, wallMat); w1.position.set(0, 2, 150); this.scene.add(w1);
+    const w2 = new THREE.Mesh(wallGeo, wallMat); w2.position.set(0, 2, -150); this.scene.add(w2);
+  }
+
+  buildPlayer() {
+    this.playerGroup = new THREE.Group();
+    
+    // Body (Capsule/Cylinder)
+    const bodyGeo = new THREE.CylinderGeometry(0.7, 0.7, 2, 16);
+    const bodyMat = new THREE.MeshLambertMaterial({ color: 0x0284c7 });
+    const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 1;
+    body.castShadow = true;
+    this.playerGroup.add(body);
+
+    // Head
+    const headGeo = new THREE.SphereGeometry(0.5, 16, 16);
+    const headMat = new THREE.MeshLambertMaterial({ color: 0xfbbf24 });
+    const head = new THREE.Mesh(headGeo, headMat);
+    head.position.y = 2.4;
+    this.playerGroup.add(head);
+
+    // Right Hand with Tool
+    this.hand = new THREE.Group();
+    this.hand.position.set(0.9, 1.4, 0.4);
+    
+    const armGeo = new THREE.BoxGeometry(0.3, 0.8, 0.3);
+    const armMat = new THREE.MeshLambertMaterial({ color: 0xfbbf24 });
+    const arm = new THREE.Mesh(armGeo, armMat);
+    this.hand.add(arm);
+
+    // 3D Pickaxe Mesh
+    this.pickMesh = new THREE.Group();
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.4), new THREE.MeshLambertMaterial({color: 0x78350f}));
+    handle.rotation.x = Math.PI / 2;
+    const headP = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.15, 0.15), new THREE.MeshLambertMaterial({color: 0x94a3b8}));
+    headP.position.set(0, 0, 0.6);
+    this.pickMesh.add(handle, headP);
+    this.pickMesh.position.set(0, -0.4, 0.3);
+    this.pickMesh.visible = false;
+    this.hand.add(this.pickMesh);
+
+    this.playerGroup.add(this.hand);
+    this.scene.add(this.playerGroup);
+  }
+
+  populateWorld() {
+    // 3D Trees with Trunk and Foliage
+    for (let i = 0; i < 45; i++) {
+      const tree = new THREE.Group();
+      const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.4, 0.6, 3.5, 8),
+        new THREE.MeshLambertMaterial({ color: 0x5c3a21 })
+      );
+      trunk.position.y = 1.75;
+      trunk.castShadow = true;
+
+      const leaves = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(2.2, 1),
+        new THREE.MeshLambertMaterial({ color: 0x15803d })
+      );
+      leaves.position.y = 4.2;
+      leaves.castShadow = true;
+
+      tree.add(trunk, leaves);
+      tree.position.set((Math.random() - 0.5) * 260, 0, (Math.random() - 0.5) * 260);
+      tree.userData = { type: 'tree', hp: 80 };
+      this.scene.add(tree);
+      this.trees.push(tree);
     }
 
-    const bnames = ['Ninja_Bot', 'Viper_Bot', 'Shadow_Bot'];
-    bnames.forEach(name => {
-      this.bots.push({
-        name, x: Math.random()*WORLD, y: Math.random()*WORLD,
-        r: 24, angle: 0, hp: 100, score: 30, weapon: 'fist', swing: 0,
-        tx: Math.random()*WORLD, ty: Math.random()*WORLD, t: 0
-      });
+    // 3D Irregular Rocks (Boulders)
+    for (let i = 0; i < 30; i++) {
+      const rock = new THREE.Mesh(
+        new THREE.DodecahedronGeometry(1.6 + Math.random()*0.8, 1),
+        new THREE.MeshLambertMaterial({ color: 0x64748b })
+      );
+      rock.scale.set(1.2, 0.8, 1.2);
+      rock.position.set((Math.random() - 0.5) * 260, 1.0, (Math.random() - 0.5) * 260);
+      rock.castShadow = true;
+      rock.userData = { type: 'rock', hp: 100 };
+      this.scene.add(rock);
+      this.rocks.push(rock);
+    }
+  }
+
+  bindEvents() {
+    window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
+    window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
+
+    // Pointer Lock for True 3D Look
+    window.addEventListener('click', () => {
+      if (document.getElementById('lobby').style.display === 'none') {
+        this.container.requestPointerLock();
+      }
+    });
+
+    window.addEventListener('mousemove', e => {
+      if (document.pointerLockElement === this.container) {
+        this.mouseRot.yaw -= e.movementX * 0.003;
+        this.mouseRot.pitch -= e.movementY * 0.003;
+        this.mouseRot.pitch = Math.max(-0.6, Math.min(0.6, this.mouseRot.pitch));
+      }
+    });
+
+    window.addEventListener('mousedown', () => {
+      if (document.pointerLockElement === this.container && !this.swinging) {
+        this.swinging = true;
+        this.swingProgress = 1.0;
+        this.playBeep(220, 0.08);
+      }
+    });
+
+    window.addEventListener('resize', () => {
+      this.camera.aspect = window.innerWidth / window.innerHeight;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(window.innerWidth, window.innerHeight);
     });
   }
 
-  bind() {
-    window.addEventListener('keydown', e => this.keys[e.key.toLowerCase()] = true);
-    window.addEventListener('keyup', e => this.keys[e.key.toLowerCase()] = false);
-    window.addEventListener('mousemove', e => { this.mouse.x = e.clientX; this.mouse.y = e.clientY; });
-    window.addEventListener('mousedown', () => { this.mouse.down = true; this.hit(this.player); });
-    window.addEventListener('mouseup', () => this.mouse.down = false);
-  }
-
-  hit(p) {
-    if (p.swing <= 0) p.swing = 1.0;
+  craft(type) {
+    if (type === 'pickaxe' && this.res.wood >= 15) {
+      this.res.wood -= 15;
+      this.res.weapon = 'pickaxe';
+      this.pickMesh.visible = true;
+      this.playBeep(520, 0.15);
+    } else if (type === 'sword' && this.res.wood >= 20 && this.res.stone >= 15) {
+      this.res.wood -= 20; this.res.stone -= 15;
+      this.res.weapon = 'sword';
+      this.playBeep(700, 0.2);
+    }
+    this.updateHUD();
   }
 
   eat() {
-    if (this.player.food > 0 && this.player.hp < 100) {
-      this.player.food--;
-      this.player.hp = Math.min(100, this.player.hp + 25);
-      this.player.hunger = Math.min(100, this.player.hunger + 30);
+    if (this.res.food > 0) {
+      this.res.food--;
+      this.res.hp = Math.min(100, this.res.hp + 25);
+      this.res.hunger = Math.min(100, this.res.hunger + 30);
+      this.playBeep(440, 0.12);
       this.updateHUD();
     }
   }
 
-  craft(type) {
-    if (type === 'pickaxe' && this.player.wood >= 15) { this.player.wood -= 15; this.player.weapon = 'pickaxe'; }
-    if (type === 'sword' && this.player.wood >= 20 && this.player.stone >= 15) { this.player.wood -= 20; this.player.stone -= 15; this.player.weapon = 'sword'; }
-    this.updateHUD();
+  updateHUD() {
+    document.getElementById('vw').innerText = this.res.wood;
+    document.getElementById('vs').innerText = this.res.stone;
+    document.getElementById('vf').innerText = this.res.food;
+    document.getElementById('hp-b').style.width = this.res.hp + '%';
+    document.getElementById('hp-t').innerText = Math.round(this.res.hp);
+    document.getElementById('hun-b').style.width = this.res.hunger + '%';
+    document.getElementById('hun-t').innerText = Math.round(this.res.hunger) + '%';
+    document.getElementById('b-pick').disabled = this.res.wood < 15;
+    document.getElementById('b-sw').disabled = (this.res.wood < 20 || this.res.stone < 15);
+  }
+
+  spawn3DDebris(pos, color) {
+    for (let i = 0; i < 6; i++) {
+      const p = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshLambertMaterial({ color }));
+      p.position.copy(pos);
+      p.position.y += 1.5;
+      p.userData = {
+        vel: new THREE.Vector3((Math.random()-0.5)*0.3, Math.random()*0.3, (Math.random()-0.5)*0.3),
+        life: 1.0
+      };
+      this.scene.add(p);
+      this.particles.push(p);
+    }
+  }
+
+  updateRemotePlayer(d) {
+    if (!this.remoteMesh) {
+      const g = new THREE.CylinderGeometry(0.7, 0.7, 2, 16);
+      const m = new THREE.MeshLambertMaterial({ color: 0x10b981 });
+      this.remoteMesh = new THREE.Mesh(g, m);
+      this.scene.add(this.remoteMesh);
+    }
+    this.remoteMesh.position.set(d.x, d.y, d.z);
+    this.remoteMesh.rotation.y = d.rot;
   }
 
   update() {
-    this.player.angle = Math.atan2(this.mouse.y - canvas.height/2, this.mouse.x - canvas.width/2);
-    let dx = 0, dy = 0;
-    if (this.keys['w'] || this.keys['arrowup']) dy -= 1;
-    if (this.keys['s'] || this.keys['arrowdown']) dy += 1;
-    if (this.keys['a'] || this.keys['arrowleft']) dx -= 1;
-    if (this.keys['d'] || this.keys['arrowright']) dx += 1;
-    if (dx && dy) { dx *= 0.707; dy *= 0.707; }
+    // Rotation & Direction
+    this.playerGroup.rotation.y = this.mouseRot.yaw;
 
-    this.player.x = Math.max(30, Math.min(WORLD - 30, this.player.x + dx * 4.8));
-    this.player.y = Math.max(30, Math.min(WORLD - 30, this.player.y + dy * 4.8));
+    // Movement Vectors
+    const forward = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mouseRot.yaw);
+    const side = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mouseRot.yaw);
+    const speed = 0.28;
 
-    this.player.hunger = Math.max(0, this.player.hunger - 0.01);
-    if (this.player.hunger === 0) this.player.hp = Math.max(0, this.player.hp - 0.03);
+    if (this.keys['w']) this.playerGroup.position.addScaledVector(forward, speed);
+    if (this.keys['s']) this.playerGroup.position.addScaledVector(forward, -speed);
+    if (this.keys['a']) this.playerGroup.position.addScaledVector(side, -speed);
+    if (this.keys['d']) this.playerGroup.position.addScaledVector(side, speed);
 
-    if (this.player.swing > 0) {
-      this.player.swing -= 0.16;
-      if (this.player.swing <= 0) this.resolveCombat(this.player);
-    }
-    if (this.mouse.down && this.player.swing <= 0) this.hit(this.player);
+    // Keep Inside World Boundaries
+    this.playerGroup.position.x = Math.max(-145, Math.min(145, this.playerGroup.position.x));
+    this.playerGroup.position.z = Math.max(-145, Math.min(145, this.playerGroup.position.z));
 
-    // Send my position to friends in room
-    if (multiplayer.peer) {
-      multiplayer.send({
-        type: 'update',
-        id: multiplayer.peer.id,
-        player: {
-          x: this.player.x, y: this.player.y, angle: this.player.angle,
-          weapon: this.player.weapon, swing: this.player.swing,
-          hp: this.player.hp, name: this.player.name, score: this.player.score
-        }
-      });
-    }
+    // Third-Person 3D Camera Follow
+    const camOffset = new THREE.Vector3(0, 3.2 + this.mouseRot.pitch * 3, 6.5).applyAxisAngle(new THREE.Vector3(0, 1, 0), this.mouseRot.yaw);
+    this.camera.position.copy(this.playerGroup.position).add(camOffset);
+    this.camera.lookAt(this.playerGroup.position.x, this.playerGroup.position.y + 1.8, this.playerGroup.position.z);
 
-    // Bots logic (only if solo)
-    this.bots.forEach(b => {
-      b.t++;
-      let d = Math.hypot(this.player.x - b.x, this.player.y - b.y);
-      if (d < 180) { b.tx = this.player.x; b.ty = this.player.y; if (d < 60) this.hit(b); }
-      else if (b.t % 90 === 0) { b.tx = b.x + (Math.random()-0.5)*300; b.ty = b.y + (Math.random()-0.5)*300; }
-      b.angle = Math.atan2(b.ty - b.y, b.tx - b.x);
-      b.x += Math.cos(b.angle)*2.2; b.y += Math.sin(b.angle)*2.2;
-      if (b.swing > 0) { b.swing -= 0.16; if (b.swing <= 0) this.resolveCombat(b); }
-    });
-
-    this.updateHUD();
-  }
-
-  resolveCombat(char) {
-    const reach = 52;
-    const hx = char.x + Math.cos(char.angle) * reach;
-    const hy = char.y + Math.sin(char.angle) * reach;
-
-    // Hit trees/stone
-    for (let i = this.resources.length - 1; i >= 0; i--) {
-      let r = this.resources[i];
-      if (Math.hypot(hx - r.x, hy - r.y) < r.r + 20) {
-        let dmg = char.weapon === 'sword' ? 35 : char.weapon === 'pickaxe' ? 25 : 12;
-        r.hp -= dmg;
-        if (char === this.player) {
-          if (r.type === 'tree') { this.player.wood += 4; if (Math.random()<0.35) this.player.food += 1; }
-          else { this.player.stone += 3; }
-          this.player.score += 6;
-        }
-        if (r.hp <= 0) this.resources.splice(i, 1);
-        break;
+    // Hand Swing Animation & Harvest
+    if (this.swinging) {
+      this.swingProgress -= 0.12;
+      this.hand.rotation.x = Math.sin(this.swingProgress * Math.PI) * 1.4;
+      if (this.swingProgress <= 0) {
+        this.swinging = false;
+        this.hand.rotation.x = 0;
+        this.resolveHarvest();
       }
     }
-  }
 
-  updateHUD() {
-    document.getElementById('val-w').innerText = this.player.wood;
-    document.getElementById('val-s').innerText = this.player.stone;
-    document.getElementById('val-f').innerText = this.player.food;
-    document.getElementById('hp-bar').style.width = Math.max(0, this.player.hp) + '%';
-    document.getElementById('hp-txt').innerText = Math.round(this.player.hp);
-    document.getElementById('hunger-bar').style.width = Math.max(0, this.player.hunger) + '%';
-    document.getElementById('hunger-txt').innerText = Math.round(this.player.hunger) + '%';
-    document.getElementById('btn-pick').disabled = this.player.wood < 15;
-    document.getElementById('btn-sword').disabled = (this.player.wood < 20 || this.player.stone < 15);
-
-    let list = [{ name: this.player.name + ' (You)', score: this.player.score }];
-    for (let id in multiplayer.networkPlayers) {
-      let np = multiplayer.networkPlayers[id];
-      list.push({ name: np.name || 'Friend', score: np.score || 0 });
+    // Update Particles
+    for (let i = this.particles.length - 1; i >= 0; i--) {
+      const p = this.particles[i];
+      p.position.add(p.userData.vel);
+      p.userData.life -= 0.04;
+      if (p.userData.life <= 0) {
+        this.scene.remove(p);
+        this.particles.splice(i, 1);
+      }
     }
-    this.bots.forEach(b => list.push({ name: b.name, score: b.score }));
-    list.sort((a,b) => b.score - a.score);
-    document.getElementById('lb-list').innerHTML = list.slice(0, 5).map((p,i)=>`<div>${i+1}. ${p.name} <strong>${p.score}</strong></div>`).join('');
-  }
 
-  render() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.save();
-    ctx.translate(canvas.width/2 - this.player.x, canvas.height/2 - this.player.y);
-
-    // Map & Border
-    ctx.strokeStyle = '#222f20'; ctx.lineWidth = 1.5;
-    for (let x = 0; x <= WORLD; x += 75) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, WORLD); ctx.stroke(); }
-    for (let y = 0; y <= WORLD; y += 75) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(WORLD, y); ctx.stroke(); }
-    ctx.strokeStyle = '#ef4444'; ctx.lineWidth = 8; ctx.strokeRect(0, 0, WORLD, WORLD);
-
-    // Trees & Stones
-    this.resources.forEach(r => {
-      ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.beginPath(); ctx.arc(r.x+5, r.y+5, r.r, 0, Math.PI*2); ctx.fill();
-      ctx.beginPath(); ctx.arc(r.x, r.y, r.r, 0, Math.PI*2);
-      ctx.fillStyle = r.type === 'tree' ? '#22c55e' : '#94a3b8'; ctx.fill();
-      ctx.strokeStyle = r.type === 'tree' ? '#15803d' : '#475569'; ctx.lineWidth = 4; ctx.stroke();
+    // Send Multiplayer Coordinates
+    net.send({
+      type: 'pos',
+      x: this.playerGroup.position.x,
+      y: this.playerGroup.position.y,
+      z: this.playerGroup.position.z,
+      rot: this.playerGroup.rotation.y
     });
 
-    // Real Online Friends
-    for (let id in multiplayer.networkPlayers) {
-      let np = multiplayer.networkPlayers[id];
-      this.drawChar(np, '#10b981', np.name || 'Friend');
-    }
-
-    // Bots
-    this.bots.forEach(b => this.drawChar(b, '#ef4444', b.name));
-
-    // You
-    this.drawChar(this.player, '#0ea5e9', this.player.name + ' (You)');
-    ctx.restore();
+    this.renderer.render(this.scene, this.camera);
   }
 
-  drawChar(char, color, name) {
-    ctx.save();
-    ctx.translate(char.x, char.y);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 12px sans-serif'; ctx.textAlign = 'center'; ctx.fillText(name, 0, -32);
-    ctx.rotate(char.angle);
-    ctx.fillStyle = '#f59e0b';
-    let po = char.swing > 0 ? 12 : 0;
-    ctx.beginPath(); ctx.arc(20 + po, 12, 7, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(20, -12, 7, 0, Math.PI*2); ctx.fill();
-    ctx.beginPath(); ctx.arc(0, 0, char.r, 0, Math.PI*2); ctx.fillStyle = color; ctx.fill();
-    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 3.5; ctx.stroke();
-    ctx.restore();
+  resolveHarvest() {
+    const pPos = this.playerGroup.position;
+    // Check hit on 3D Trees
+    this.trees.forEach(t => {
+      if (pPos.distanceTo(t.position) < 4.5) {
+        t.userData.hp -= (this.res.weapon === 'pickaxe' ? 30 : 15);
+        this.spawn3DDebris(t.position, 0x15803d);
+        this.playBeep(180, 0.1);
+        this.res.wood += 5;
+        if (Math.random() < 0.4) this.res.food += 1;
+        this.updateHUD();
+      }
+    });
+
+    // Check hit on 3D Rocks
+    this.rocks.forEach(r => {
+      if (pPos.distanceTo(r.position) < 4.2) {
+        r.userData.hp -= (this.res.weapon === 'pickaxe' ? 35 : 12);
+        this.spawn3DDebris(r.position, 0x64748b);
+        this.playBeep(320, 0.1);
+        this.res.stone += 4;
+        this.updateHUD();
+      }
+    });
   }
 
   loop() {
     this.update();
-    this.render();
     requestAnimationFrame(() => this.loop());
   }
 }
 
-const game = new GameEngine();
-game.loop();
+const world = new World3D();
+world.loop();
 </script>
 </body>
 </html>
